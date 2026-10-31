@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Acteo Settings",
+  "type": "object",
+  "properties": {
+    "input_folder": { "type": ["string", "null"] },
+    "output_folder": { "type": ["string", "null"] },
+    "discard_folder": { "type": ["string", "null"] },
+
+    "grouping_mode": { "type": "string", "enum": ["timestamp_gap", "manual", "filename_pattern"] },
+    "timestamp_gap_seconds": { "type": "integer", "minimum": 0 },
+
+    "images_per_sequence": { "type": "integer", "minimum": 1 },
+
+    "move_mode": { "type": "string", "enum": ["move", "copy"] },
+    "preserve_folder_structure": { "type": "boolean" },
+    "safe_delete": { "type": "boolean" },
+
+    "category_file_path": { "type": ["string", "null"] },
+    "metadata_file_path": { "type": ["string", "null"] },
+    "thumbnails_cache_dir": { "type": ["string", "null"] },
+
+    "concurrency": { "type": "integer", "minimum": 1 },
+    "exif_priority": { "type": "boolean" },
+    "file_patterns": { "type": "array", "items": { "type": "string" } },
+
+    "operator_name": { "type": ["string", "null"] },
+    "last_scanned": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "required": ["grouping_mode", "timestamp_gap_seconds", "images_per_sequence", "move_mode"],
+  "additionalProperties": false
+}
