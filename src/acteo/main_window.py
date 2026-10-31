@@ -11,8 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QIcon, QKeyEvent
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -79,6 +79,11 @@ class MainWindow(QMainWindow):
         self._undo_stack = UndoStack()
         self._classification_rows: List[dict[str, object]] = []
         self._categories = self._load_categories_from_disk()
+        self._autoplay_timer = QTimer(self)
+        self._autoplay_timer.setSingleShot(False)
+        self._autoplay_timer.timeout.connect(self._advance_autoplay)
+        self._is_playing = False
+        self._play_pause_action: Optional[object] = None
 
         self.setWindowTitle("Acteo — Trail Camera Image Classifier")
         self.setGeometry(100, 100, 1400, 900)
@@ -166,6 +171,10 @@ class MainWindow(QMainWindow):
 
         next_btn = toolbar.addAction("Next >")
         next_btn.triggered.connect(self._next_sequence)
+
+        self._play_pause_action = toolbar.addAction("▶ Play")
+        self._play_pause_action.triggered.connect(self._toggle_play_pause)
+        self._apply_play_pause_icon()
 
         # Status bar
         self._status_bar = QStatusBar()
@@ -300,6 +309,66 @@ class MainWindow(QMainWindow):
         """Handle image selection in viewer."""
         msg = f"Selected image {index} from sequence {sequence_id}"
         self._status_label.setText(msg)
+
+    def _apply_play_pause_icon(self) -> None:
+        """Set the play/pause icon and text for the current running state."""
+        if self._play_pause_action is None:
+            return
+
+        if self._is_playing:
+            self._play_pause_action.setText("❚❚ Pause")
+            self._play_pause_action.setToolTip("Pause autoplay")
+            icon = QIcon.fromTheme("media-playback-pause")
+            if icon.isNull():
+                icon = QIcon.fromTheme("media-playback-pause-symbolic")
+            if not icon.isNull():
+                self._play_pause_action.setIcon(icon)
+        else:
+            self._play_pause_action.setText("▶ Play")
+            self._play_pause_action.setToolTip("Play autoplay")
+            icon = QIcon.fromTheme("media-playback-start")
+            if icon.isNull():
+                icon = QIcon.fromTheme("media-playback-start-symbolic")
+            if not icon.isNull():
+                self._play_pause_action.setIcon(icon)
+
+    def _toggle_play_pause(self) -> None:
+        """Toggle autoplay for the active sequence."""
+        if not self._sequences:
+            return
+
+        if self._is_playing:
+            self._autoplay_timer.stop()
+            self._is_playing = False
+            self._apply_play_pause_icon()
+            self._status_label.setText("Autoplay paused")
+            return
+
+        interval_ms = max(250, int(getattr(self.settings, "autoplay_interval_seconds", 1)) * 1000)
+        self._autoplay_timer.setInterval(interval_ms)
+        self._autoplay_timer.start()
+        self._is_playing = True
+        self._apply_play_pause_icon()
+        self._status_label.setText("Autoplay playing")
+
+    def _advance_autoplay(self) -> None:
+        """Move to the next image in the active sequence when autoplay is running."""
+        if not self._sequences or not self._is_playing:
+            return
+
+        if not (0 <= self._current_sequence_index < len(self._sequences)):
+            self._toggle_play_pause()
+            return
+
+        current_sequence = self._sequences[self._current_sequence_index]
+        if not current_sequence.image_paths:
+            self._toggle_play_pause()
+            return
+
+        next_index = (self._image_viewer.get_selected_index() + 1) % len(
+            current_sequence.image_paths
+        )
+        self._image_viewer._on_tile_clicked(next_index)
 
     def _load_categories_from_disk(self) -> List[dict[str, object]]:
         """Load categories from the configured category file, if present."""
