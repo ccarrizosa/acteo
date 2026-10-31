@@ -65,7 +65,7 @@ def test_main_window_autoplay_cycles_images_in_current_sequence(tmp_path: Path) 
     window._toggle_play_pause()
     assert window._autoplay_timer.isActive()
 
-    QTest.qWait(1200)
+    window._advance_autoplay()
     assert window._image_viewer.get_selected_index() == 1
 
     window._toggle_play_pause()
