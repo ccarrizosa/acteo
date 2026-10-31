@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon, QKeyEvent
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -344,7 +344,10 @@ class MainWindow(QMainWindow):
             self._status_label.setText("Autoplay paused")
             return
 
-        interval_ms = max(250, int(getattr(self.settings, "autoplay_interval_seconds", 1)) * 1000)
+        interval_seconds = int(
+            getattr(self.settings, "autoplay_interval_seconds", 1)
+        )
+        interval_ms = max(250, interval_seconds * 1000)
         self._autoplay_timer.setInterval(interval_ms)
         self._autoplay_timer.start()
         self._is_playing = True
