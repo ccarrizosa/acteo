@@ -56,6 +56,9 @@ class SettingsDialog(QDialog):
         self.timestamp_gap_spin = QSpinBox()
         self.timestamp_gap_spin.setRange(1, 3600)
 
+        self.autoplay_interval_spin = QSpinBox()
+        self.autoplay_interval_spin.setRange(1, 300)
+
         self.fixed_group_size_spin = QSpinBox()
         self.fixed_group_size_spin.setRange(1, 1000)
 
@@ -69,6 +72,7 @@ class SettingsDialog(QDialog):
             ("Discard folder", self._make_browse_widget(self.discard_folder_edit)),
             ("Grouping mode", self.grouping_mode_combo),
             ("Timestamp gap (s)", self.timestamp_gap_spin),
+            ("Autoplay interval (s)", self.autoplay_interval_spin),
             ("Fixed group size", self.fixed_group_size_spin),
             ("Prefer EXIF timestamps", self.exif_priority_check),
             ("Move mode", self.move_mode_combo),
@@ -110,6 +114,9 @@ class SettingsDialog(QDialog):
             else "timestamp_gap"
         )
         self.timestamp_gap_spin.setValue(int(settings.timestamp_gap_seconds))
+        self.autoplay_interval_spin.setValue(
+            max(1, int(settings.autoplay_interval_seconds))
+        )
         self.fixed_group_size_spin.setValue(int(settings.fixed_group_size))
         self.exif_priority_check.setChecked(bool(settings.exif_priority))
         if settings.move_mode in {"move", "copy"}:
@@ -145,6 +152,9 @@ class SettingsDialog(QDialog):
         self.settings.discard_folder = self.discard_folder_edit.text().strip() or None
         self.settings.grouping_mode = self.grouping_mode_combo.currentText()
         self.settings.timestamp_gap_seconds = int(self.timestamp_gap_spin.value())
+        self.settings.autoplay_interval_seconds = int(
+            self.autoplay_interval_spin.value()
+        )
         self.settings.fixed_group_size = int(self.fixed_group_size_spin.value())
         self.settings.exif_priority = bool(self.exif_priority_check.isChecked())
         self.settings.move_mode = self.move_mode_combo.currentText()

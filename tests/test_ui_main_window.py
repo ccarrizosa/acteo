@@ -41,6 +41,37 @@ def test_main_window_sets_sequences_and_populates_viewer(tmp_path: Path) -> None
     assert window._image_viewer.get_selected_index() == 0
 
 
+def test_main_window_autoplay_cycles_images_in_current_sequence(tmp_path: Path) -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    img1 = tmp_path / "autoplay_1.jpg"
+    img2 = tmp_path / "autoplay_2.jpg"
+    img1.write_bytes(b"\xff\xd8\xff\xd9")
+    img2.write_bytes(b"\xff\xd8\xff\xd9")
+
+    seq = Sequence(
+        id="seq-auto",
+        image_paths=[str(img1), str(img2)],
+        start_ts=datetime.utcnow(),
+        end_ts=datetime.utcnow(),
+    )
+
+    settings = Settings(autoplay_interval_seconds=1)
+    window = MainWindow(settings=settings, sequences=[seq])
+
+    assert window.settings.autoplay_interval_seconds == 1
+    window._toggle_play_pause()
+    assert window._autoplay_timer.isActive()
+
+    window._advance_autoplay()
+    assert window._image_viewer.get_selected_index() == 1
+
+    window._toggle_play_pause()
+    assert not window._autoplay_timer.isActive()
+
+
 def test_thumbnail_tile_size_matches_thumbnail_dimensions(tmp_path: Path) -> None:
     app = QApplication.instance()
     if app is None:

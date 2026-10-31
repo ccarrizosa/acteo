@@ -36,6 +36,8 @@ class Settings:
 
     - images_per_sequence: Default number of images to present in the UI grid
         for each sequence. The UI may still show fewer images for short sequences.
+    - autoplay_interval_seconds: Time in seconds between automatic image changes
+        while the viewer is playing a sequence.
 
     - move_mode: Defines file operation when classifying a sequence: "move"
         will relocate originals to the `output_folder`; "copy" will duplicate
@@ -77,6 +79,7 @@ class Settings:
 
     # Presentation
     images_per_sequence: int = 3
+    autoplay_interval_seconds: int = 1
 
     # File operations
     move_mode: str = "move"  # move | copy
@@ -117,6 +120,13 @@ class Settings:
                 d["images_per_sequence"] = int(d["images_per_sequence"])
             except Exception:
                 d["images_per_sequence"] = cls().images_per_sequence
+        if "autoplay_interval_seconds" in d:
+            try:
+                d["autoplay_interval_seconds"] = max(
+                    1, int(d["autoplay_interval_seconds"])
+                )
+            except Exception:
+                d["autoplay_interval_seconds"] = cls().autoplay_interval_seconds
         if "fixed_group_size" in d:
             try:
                 d["fixed_group_size"] = int(d["fixed_group_size"])
