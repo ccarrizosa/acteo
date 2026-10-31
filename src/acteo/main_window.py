@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QKeyEvent
+from PySide6.QtGui import QAction, QIcon, QKeyEvent
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self._autoplay_timer.setSingleShot(False)
         self._autoplay_timer.timeout.connect(self._advance_autoplay)
         self._is_playing = False
-        self._play_pause_action: Optional[object] = None
+        self._play_pause_action: Optional[QAction] = None
 
         self.setWindowTitle("Acteo — Trail Camera Image Classifier")
         self.setGeometry(100, 100, 1400, 900)
