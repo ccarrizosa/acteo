@@ -688,12 +688,12 @@ class MainWindow(QMainWindow):
         if not skipped_paths:
             return
 
+        discard_mode = "move to discard folder" if self.settings.safe_delete else "permanently delete"
         reply = QMessageBox.question(
             self,
             "Confirm Skip",
             (
-                f"Move {len(skipped_paths)} image(s) from sequence {seq.id} "
-                "to the discard folder?"
+                f"{discard_mode.capitalize()} {len(skipped_paths)} image(s) from sequence {seq.id}?"
             ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -701,7 +701,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            dest_paths = bulk_skip(skipped_paths, str(discard_folder))
+            dest_paths = bulk_skip(skipped_paths, str(discard_folder), safe=self.settings.safe_delete)
             remaining_paths = [path for path in all_paths if path not in skipped_paths]
             self._sequences[self._current_sequence_index] = Sequence(
                 id=seq.id,
@@ -737,27 +737,41 @@ class MainWindow(QMainWindow):
             return
 
         seq = self._sequences[self._current_sequence_index]
+        discard_mode = "discard" if self.settings.safe_delete else "permanently delete"
         reply = QMessageBox.question(
             self,
             "Confirm Discard",
-            f"Discard sequence {seq.id} ({len(seq.image_paths)} images)?",
+            f"{discard_mode.capitalize()} sequence {seq.id} ({len(seq.image_paths)} images)?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        discard_folder = self._validate_discard_folder_for_action()
-        if discard_folder is None:
-            return
+        original_paths = list(seq.image_paths)
+        dest_paths: list[str] = []
+        if self.settings.safe_delete:
+            discard_folder = self._validate_discard_folder_for_action()
+            if discard_folder is None:
+                return
+            try:
+                discard_files(original_paths, str(discard_folder), safe=True)
+                discard_root = Path(discard_folder)
+                for src in original_paths:
+                    src_path = Path(str(src))
+                    dest_paths.append(str(discard_root / src_path.name))
+            except Exception as exc:  # pragma: no cover - defensive UX path
+                QMessageBox.critical(self, "Discard Failed", str(exc))
+                logger.exception("Failed to discard sequence %s: %s", seq.id, exc)
+                return
+        else:
+            try:
+                discard_files(original_paths, str(Path(".")), safe=False)
+            except Exception as exc:  # pragma: no cover - defensive UX path
+                QMessageBox.critical(self, "Discard Failed", str(exc))
+                logger.exception("Failed to discard sequence %s: %s", seq.id, exc)
+                return
 
         try:
-            dest_paths: list[str] = []
-            original_paths = list(seq.image_paths)
-            discard_files(original_paths, str(discard_folder), safe=True)
-            discard_root = Path(discard_folder)
-            for src in original_paths:
-                src_path = Path(str(src))
-                dest_paths.append(str(discard_root / src_path.name))
 
             action = Action(
                 action_type=ActionType.DISCARD,

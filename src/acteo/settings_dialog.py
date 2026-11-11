@@ -66,6 +66,12 @@ class SettingsDialog(QDialog):
         self.move_mode_combo = QComboBox()
         self.move_mode_combo.addItems(["move", "copy"])
 
+        self.safe_delete_check = QCheckBox()
+        self.category_file_edit = QLineEdit()
+        self.metadata_file_edit = QLineEdit()
+        self.thumbnails_cache_edit = QLineEdit()
+        self.operator_name_edit = QLineEdit()
+
         for label, widget in (
             ("Input folder", self._make_browse_widget(self.input_folder_edit)),
             ("Output folder", self._make_browse_widget(self.output_folder_edit)),
@@ -76,6 +82,11 @@ class SettingsDialog(QDialog):
             ("Fixed group size", self.fixed_group_size_spin),
             ("Prefer EXIF timestamps", self.exif_priority_check),
             ("Move mode", self.move_mode_combo),
+            ("Safe delete", self.safe_delete_check),
+            ("Category file", self._make_browse_widget(self.category_file_edit, is_file=True)),
+            ("Metadata file", self._make_browse_widget(self.metadata_file_edit, is_file=True)),
+            ("Thumbnails cache dir", self._make_browse_widget(self.thumbnails_cache_edit)),
+            ("Operator name", self.operator_name_edit),
         ):
             form.addRow(label, widget)
 
@@ -88,21 +99,24 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def _make_browse_widget(self, line_edit: QLineEdit) -> QWidget:
+    def _make_browse_widget(self, line_edit: QLineEdit, *, is_file: bool = False) -> QWidget:
         widget = QWidget()
         row = QHBoxLayout(widget)
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(line_edit)
 
         browse_btn = QPushButton("Browse")
-        browse_btn.clicked.connect(lambda: self._browse_folder(line_edit))
+        browse_btn.clicked.connect(lambda: self._browse_path(line_edit, is_file=is_file))
         row.addWidget(browse_btn)
         return widget
 
-    def _browse_folder(self, target: QLineEdit) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Select folder")
-        if directory:
-            target.setText(directory)
+    def _browse_path(self, target: QLineEdit, *, is_file: bool = False) -> None:
+        if is_file:
+            path, _ = QFileDialog.getOpenFileName(self, "Select file")
+        else:
+            path = QFileDialog.getExistingDirectory(self, "Select folder")
+        if path:
+            target.setText(path)
 
     def load_from_settings(self, settings: Settings) -> None:
         self.input_folder_edit.setText(settings.input_folder or "")
@@ -119,6 +133,11 @@ class SettingsDialog(QDialog):
         )
         self.fixed_group_size_spin.setValue(int(settings.fixed_group_size))
         self.exif_priority_check.setChecked(bool(settings.exif_priority))
+        self.safe_delete_check.setChecked(bool(settings.safe_delete))
+        self.category_file_edit.setText(settings.category_file_path or "")
+        self.metadata_file_edit.setText(settings.metadata_file_path or "")
+        self.thumbnails_cache_edit.setText(settings.thumbnails_cache_dir or "")
+        self.operator_name_edit.setText(settings.operator_name or "")
         if settings.move_mode in {"move", "copy"}:
             self.move_mode_combo.setCurrentText(settings.move_mode)
         else:
@@ -158,6 +177,11 @@ class SettingsDialog(QDialog):
         self.settings.fixed_group_size = int(self.fixed_group_size_spin.value())
         self.settings.exif_priority = bool(self.exif_priority_check.isChecked())
         self.settings.move_mode = self.move_mode_combo.currentText()
+        self.settings.safe_delete = bool(self.safe_delete_check.isChecked())
+        self.settings.category_file_path = self.category_file_edit.text().strip() or None
+        self.settings.metadata_file_path = self.metadata_file_edit.text().strip() or None
+        self.settings.thumbnails_cache_dir = self.thumbnails_cache_edit.text().strip() or None
+        self.settings.operator_name = self.operator_name_edit.text().strip() or None
         self.settings = ensure_paths(self.settings)
         self.settings.save(self.config_path)
         return self.settings

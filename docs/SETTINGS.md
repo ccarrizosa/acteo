@@ -35,22 +35,12 @@ Grouping
 - fixed_group_size
   Number of images per sequence when `grouping_mode` is `fixed_size`.
 
-Presentation
-------------
-- images_per_sequence
-  Number of images to display for each sequence in the UI grid. The UI will
-  handle sequences shorter than this number gracefully.
-
 File operations
 ---------------
 - move_mode
   `move` (default): relocate original files to the `output_folder` after
   classification.
   `copy`: copy files to `output_folder` and keep originals in-place.
-
-- preserve_folder_structure
-  If true, the tool will recreate the subfolder hierarchy from the
-  `input_folder` inside the `output_folder` when moving/copying files.
 
 - safe_delete
   When true, discard actions move files to `discard_folder` instead of
@@ -72,9 +62,6 @@ Auxiliary paths
 
 IO & behavior
 -------------
-- concurrency
-  Number of concurrent workers for IO-bound tasks (thumbnailing, move/copy).
-
 - autoplay_interval_seconds
   Number of seconds between automatic image changes while previewing a
   sequence in the viewer.
@@ -83,16 +70,10 @@ IO & behavior
   If true, use EXIF DateTimeOriginal for image timestamps when available.
   Otherwise, fall back to filesystem modification time (mtime).
 
-- file_patterns
-  Glob patterns used to discover image files in the `input_folder`.
-
 Operator & Misc
 ---------------
 - operator_name
   Optional human-readable name of the operator; recorded in metadata.
-
-- last_scanned
-  ISO timestamp set to the last successful scan of the `input_folder`.
 
 Notes
 -----

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import jsonschema
 
@@ -24,6 +23,17 @@ def validate_settings_data(data: dict[str, Any]) -> None:
         jsonschema.validate(data, _load_schema())
     except jsonschema.ValidationError as exc:
         raise ValueError(f"Invalid settings: {exc.message}") from exc
+
+
+def _filter_known_settings(data: dict[str, Any]) -> dict[str, Any]:
+    """Return only settings keys recognized by the current schema.
+
+    Legacy or removed fields are ignored so older config files do not block app
+    startup.
+    """
+    schema = _load_schema()
+    allowed = set(schema.get("properties", {}).keys())
+    return {key: value for key, value in data.items() if key in allowed}
 
 @dataclass
 class Settings:
@@ -49,16 +59,12 @@ class Settings:
     - fixed_group_size: Number of images per sequence when `grouping_mode` is
         "fixed_size".
 
-    - images_per_sequence: Default number of images to present in the UI grid
-        for each sequence. The UI may still show fewer images for short sequences.
     - autoplay_interval_seconds: Time in seconds between automatic image changes
         while the viewer is playing a sequence.
 
     - move_mode: Defines file operation when classifying a sequence: "move"
         will relocate originals to the `output_folder`; "copy" will duplicate
         files leaving originals in place.
-    - preserve_folder_structure: When true, keep subfolder layout from the
-        `input_folder` when moving/copying to the `output_folder`.
     - safe_delete: When enabled, discard operations will not permanently delete
         files — they will be moved to the `discard_folder` instead. If false,
         discard may perform permanent deletion depending on platform and config.
@@ -69,16 +75,10 @@ class Settings:
     - thumbnails_cache_dir: Directory where generated thumbnails are cached to
         speed up UI listing and reduce repeated image decoding.
 
-    - concurrency: Number of concurrent IO workers used for move/copy and
-        thumbnail generation. Increase for faster disks; reduce for low-RAM
-        environments.
     - exif_priority: Prefer reading EXIF DateTimeOriginal when available; if
         false, the loader will prefer filesystem mtime.
-    - file_patterns: Glob patterns to include when scanning for images.
 
     - operator_name: Optional name of the current operator to include in logs.
-    - last_scanned: ISO timestamp of the last successful folder scan; used to
-        show recency in the UI.
     """
     # Folders
     input_folder: Optional[str] = None
@@ -91,12 +91,10 @@ class Settings:
     fixed_group_size: int = 3
 
     # Presentation
-    images_per_sequence: int = 3
     autoplay_interval_seconds: int = 1
 
     # File operations
     move_mode: str = "move"  # move | copy
-    preserve_folder_structure: bool = False
     safe_delete: bool = False
 
     # Paths for auxiliary files
@@ -105,23 +103,17 @@ class Settings:
     thumbnails_cache_dir: Optional[str] = None
 
     # IO & behavior
-    concurrency: int = 2
     exif_priority: bool = True  # prefer EXIF timestamp over mtime
-    file_patterns: List[str] = field(
-        default_factory=lambda: ["*.jpg", "*.jpeg", "*.png"]
-    )
 
     # Operator
     operator_name: Optional[str] = None
-
-    # Misc
-    last_scanned: Optional[str] = None  # ISO timestamp
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Settings":
+        d = _filter_known_settings(d)
         defaults = cls().to_dict()
         merged = defaults.copy()
         merged.update(d)
@@ -133,11 +125,6 @@ class Settings:
                 d["timestamp_gap_seconds"] = int(d["timestamp_gap_seconds"])
             except Exception:
                 d["timestamp_gap_seconds"] = cls().timestamp_gap_seconds
-        if "images_per_sequence" in d:
-            try:
-                d["images_per_sequence"] = int(d["images_per_sequence"])
-            except Exception:
-                d["images_per_sequence"] = cls().images_per_sequence
         if "autoplay_interval_seconds" in d:
             try:
                 d["autoplay_interval_seconds"] = max(
@@ -179,15 +166,12 @@ class Settings:
 
         settings = cls.from_dict(data)
         normalized = settings.to_dict()
-        if data != normalized:
+        filtered_data = _filter_known_settings(data)
+        if filtered_data != normalized:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(normalized, f, indent=2, ensure_ascii=False)
         return settings
-
-    def update_last_scanned(self) -> None:
-        self.last_scanned = datetime.utcnow().isoformat()
-
 
 def default_config_dir() -> str:
     # Respect XDG on Linux, fall back to home
@@ -234,6 +218,5 @@ if __name__ == "__main__":
     cfg.output_folder = "~/Pictures/trailcam_output"
     cfg.discard_folder = "~/Pictures/trailcam_discard"
     cfg.operator_name = os.getenv("USER")
-    cfg.update_last_scanned()
     cfg = ensure_paths(cfg)
     print(json.dumps(cfg.to_dict(), indent=2))

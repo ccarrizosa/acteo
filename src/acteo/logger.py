@@ -20,8 +20,8 @@ def append_sequence_metadata(
 ) -> None:
     """Append `row` to CSV at `path`, creating parent directories when needed.
 
-    This is a convenience helper that performs a synchronous append. For high
-    concurrency use `BackgroundCSVWriter` below which provides a single-writer
+    This is a convenience helper that performs a synchronous append. For
+    high-throughput writes, `BackgroundCSVWriter` below provides a single-writer
     queue.
     """
     p = Path(path)

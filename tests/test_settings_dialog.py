@@ -51,3 +51,32 @@ def test_settings_dialog_saves_and_applies_values(tmp_path: Path) -> None:
     assert payload["grouping_mode"] == "fixed_size"
     assert payload["fixed_group_size"] == 5
     assert payload["move_mode"] == "copy"
+
+
+def test_settings_dialog_saves_missing_optional_settings(tmp_path: Path) -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    settings = Settings(
+        category_file_path="/tmp/categories.json",
+        metadata_file_path="/tmp/metadata.csv",
+        thumbnails_cache_dir="/tmp/thumbs",
+        operator_name="Alice",
+        safe_delete=True,
+    )
+
+    dialog = SettingsDialog(settings, config_path=str(tmp_path / "settings.json"))
+    dialog.category_file_edit.setText(str(tmp_path / "new_categories.json"))
+    dialog.metadata_file_edit.setText(str(tmp_path / "new_metadata.csv"))
+    dialog.thumbnails_cache_edit.setText(str(tmp_path / "new_thumbs"))
+    dialog.operator_name_edit.setText("Bob")
+    dialog.safe_delete_check.setChecked(False)
+
+    dialog.apply_to_settings()
+
+    assert settings.category_file_path == str(tmp_path / "new_categories.json")
+    assert settings.metadata_file_path == str(tmp_path / "new_metadata.csv")
+    assert settings.thumbnails_cache_dir == str(tmp_path / "new_thumbs")
+    assert settings.operator_name == "Bob"
+    assert settings.safe_delete is False

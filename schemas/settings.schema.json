@@ -12,23 +12,17 @@
     "fixed_group_size": { "type": "integer", "minimum": 1 },
     "autoplay_interval_seconds": { "type": "integer", "minimum": 1 },
 
-    "images_per_sequence": { "type": "integer", "minimum": 1 },
-
     "move_mode": { "type": "string", "enum": ["move", "copy"] },
-    "preserve_folder_structure": { "type": "boolean" },
     "safe_delete": { "type": "boolean" },
 
     "category_file_path": { "type": ["string", "null"] },
     "metadata_file_path": { "type": ["string", "null"] },
     "thumbnails_cache_dir": { "type": ["string", "null"] },
 
-    "concurrency": { "type": "integer", "minimum": 1 },
     "exif_priority": { "type": "boolean" },
-    "file_patterns": { "type": "array", "items": { "type": "string" } },
 
-    "operator_name": { "type": ["string", "null"] },
-    "last_scanned": { "type": ["string", "null"], "format": "date-time" }
+    "operator_name": { "type": ["string", "null"] }
   },
-  "required": ["grouping_mode", "timestamp_gap_seconds", "fixed_group_size", "autoplay_interval_seconds", "images_per_sequence", "move_mode"],
+  "required": ["grouping_mode", "timestamp_gap_seconds", "fixed_group_size", "autoplay_interval_seconds", "move_mode"],
   "additionalProperties": false
 }

@@ -99,20 +99,28 @@ def discard_files(paths: Iterable[str], discard_folder: str, safe: bool = True) 
                 logger.exception("Failed to delete %s: %s", src, exc)
 
 
-def bulk_skip(paths: Iterable[str], discard_folder: str) -> List[str]:
-    """Move several files to a discard directory and return their destination paths.
+def bulk_skip(paths: Iterable[str], discard_folder: str, safe: bool = True) -> List[str]:
+    """Move several files to a discard directory or delete them in-place.
 
     This is the bulk counterpart to `discard_files` and is intended for Phase D
-    “skip” operations in the UI.
+    "skip" operations in the UI.
     """
     destinations: List[str] = []
-    d = Path(discard_folder)
-    d.mkdir(parents=True, exist_ok=True)
-    for p in paths:
-        src = Path(p)
-        dst = d / src.name
-        safe_move(str(src), str(dst))
-        destinations.append(str(dst))
+    if safe:
+        d = Path(discard_folder)
+        d.mkdir(parents=True, exist_ok=True)
+        for p in paths:
+            src = Path(p)
+            dst = d / src.name
+            safe_move(str(src), str(dst))
+            destinations.append(str(dst))
+    else:
+        for p in paths:
+            src = Path(p)
+            try:
+                src.unlink()
+            except Exception as exc:
+                logger.exception("Failed to delete %s: %s", src, exc)
     return destinations
 
 

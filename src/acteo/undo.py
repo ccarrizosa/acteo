@@ -125,6 +125,8 @@ class UndoStack:
                     pass
 
         elif action.action_type == ActionType.DISCARD:
+            if not action.dst_paths:
+                return
             # Reverse: move from discard folder back to original location
             from .storage import safe_move
 
