@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -36,18 +36,24 @@ class ImageTile(QWidget):
         index: int,
         size: int = 150,
         cache: Optional[ThumbnailCache] = None,
+        tile_width: Optional[int] = None,
+        tile_height: Optional[int] = None,
     ) -> None:
         """Initialize a tile.
 
         Args:
             path: File path to the image.
             index: Index in the sequence.
-            size: Desired tile size in pixels.
+            size: Desired square tile size in pixels.
             cache: Shared thumbnail cache used to avoid repeated decoding.
+            tile_width: Optional width for the tile; falls back to ``size``.
+            tile_height: Optional height for the tile; falls back to ``size``.
         """
         super().__init__()
         self.path = path
         self.index = index
+        self.tile_width = tile_width if tile_width is not None else size
+        self.tile_height = tile_height if tile_height is not None else size
         self.tile_size = size
         self.zoom_factor = 1.0
         self.rotation = 0  # degrees
@@ -59,21 +65,32 @@ class ImageTile(QWidget):
         self._layout.setSpacing(0)
 
         self._display_label = QLabel()
-        self._display_label.setFixedSize(size, size)
+        self._display_label.setFixedSize(self.tile_width, self.tile_height)
         self._display_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._display_label.setStyleSheet(
-            "border: 1px solid #cccccc; background: #f3f3f3;"
+            "border: 0; background: #f3f3f3; margin: 0; padding: 0;"
         )
         self._layout.addWidget(self._display_label)
 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setStyleSheet("border: 1px solid #cccccc; padding: 2px;")
+        self.setStyleSheet("border: 0; padding: 0px;")
         self._load_and_display()
+
+    def _scaled_for_tile(self, pixmap: QPixmap) -> QPixmap:
+        """Scale a pixmap to fit the tile while preserving its original aspect ratio."""
+        scaled_width = max(1, int(self.tile_width * self.zoom_factor))
+        scaled_height = max(1, int(self.tile_height * self.zoom_factor))
+        return pixmap.scaled(
+            scaled_width,
+            scaled_height,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
 
     def _load_and_display(self) -> None:
         """Load image from disk and paint it together with its filename."""
         try:
-            cached = self._cache.get(self.path, size=self.tile_size)
+            cached = self._cache.get(self.path, size=max(self.tile_width, self.tile_height))
             if cached is None:
                 self._display_label.setText(f"Error loading\n{Path(self.path).name}")
                 return
@@ -86,29 +103,21 @@ class ImageTile(QWidget):
                     transform, Qt.TransformationMode.SmoothTransformation
                 )
 
-            base = pixmap.scaledToWidth(
-                int(self.tile_size * self.zoom_factor),
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            if base.height() > self.tile_size:
-                base = pixmap.scaledToHeight(
-                    int(self.tile_size * self.zoom_factor),
-                    Qt.TransformationMode.SmoothTransformation,
-                )
+            base = self._scaled_for_tile(pixmap)
 
-            canvas = QPixmap(self.tile_size, self.tile_size)
+            canvas = QPixmap(self.tile_width, self.tile_height)
             canvas.fill("#f3f3f3")
 
             painter = QPainter(canvas)
             try:
-                x_offset = max(0, (self.tile_size - base.width()) // 2)
-                y_offset = 0
-                painter.drawPixmap(x_offset, y_offset, base)
+                x_offset = max(0, (base.width() - self.tile_width) // 2)
+                y_offset = max(0, (base.height() - self.tile_height) // 2)
+                painter.drawPixmap(-x_offset, -y_offset, base)
 
-                footer_height = max(14, int(self.tile_size * 0.18))
+                footer_height = max(14, int(self.tile_height * 0.18))
                 footer_rect = canvas.rect().adjusted(
                     0,
-                    self.tile_size - footer_height,
+                    self.tile_height - footer_height,
                     0,
                     0,
                 )
@@ -152,9 +161,9 @@ class ImageTile(QWidget):
         """Highlight this tile as selected."""
         self.selected = selected
         if selected:
-            self.setStyleSheet("border: 2px solid #0078d4; padding: 2px;")
+            self.setStyleSheet("border: 1px solid #0078d4; padding: 0px;")
         else:
-            self.setStyleSheet("border: 1px solid #cccccc; padding: 2px;")
+            self.setStyleSheet("border: 0; padding: 0px;")
 
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -210,7 +219,7 @@ class ImageViewer(QWidget):
         self._scroll.setWidgetResizable(True)
         self._grid_widget = QWidget()
         self._grid_layout = QGridLayout()
-        self._grid_layout.setSpacing(6)
+        self._grid_layout.setSpacing(0)
         self._grid_widget.setLayout(self._grid_layout)
         self._scroll.setWidget(self._grid_widget)
 
@@ -249,7 +258,41 @@ class ImageViewer(QWidget):
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         """Keep the selected preview scaled to the current pane size."""
         super().resizeEvent(event)
+        self._update_thumbnail_grid()
         self._update_selected_preview()
+
+    @override
+    def showEvent(self, event: QShowEvent) -> None:  # type: ignore[name-defined]
+        """Refresh thumbnail sizing once the widget is actually visible."""
+        super().showEvent(event)
+        QTimer.singleShot(0, self._update_thumbnail_grid)
+        QTimer.singleShot(0, self._update_selected_preview)
+
+    def _update_thumbnail_grid(self) -> None:
+        """Distribute the strip width evenly across all thumbnails."""
+        if not self._tiles:
+            return
+
+        viewport_width = self._scroll.viewport().width() or self._scroll.width() or self.width()
+        viewport_height = self._scroll.viewport().height() or self._scroll.height() or self.height()
+        total_width = max(1, viewport_width)
+        total_height = max(1, viewport_height)
+        tile_count = len(self._tiles)
+        base_width = total_width // tile_count
+        remainder = total_width % tile_count
+
+        self._grid_layout.setContentsMargins(0, 0, 0, 0)
+        self._grid_layout.setSpacing(0)
+
+        for index, tile in enumerate(self._tiles):
+            tile_width = base_width + (1 if index < remainder else 0)
+            tile.setFixedSize(tile_width, total_height)
+            tile._display_label.setFixedSize(tile_width, total_height)
+            tile._load_and_display()
+            self._grid_layout.addWidget(tile, 0, index)
+
+        self._grid_widget.setFixedSize(total_width, total_height)
+        self._grid_widget.setStyleSheet("background: transparent;")
 
     def set_sequence(self, sequence_id: str, image_paths: List[str]) -> None:
         """Display a sequence of images."""
@@ -269,14 +312,18 @@ class ImageViewer(QWidget):
                     widget.deleteLater()
 
         for i, path in enumerate(image_paths):
-            tile = ImageTile(path, i, size=130, cache=self._thumbnail_cache)
+            tile = ImageTile(
+                path,
+                i,
+                size=130,
+                cache=self._thumbnail_cache,
+                tile_width=130,
+                tile_height=130,
+            )
             tile.clicked.connect(self._on_tile_clicked)
             self._tiles.append(tile)
 
-        for i, tile in enumerate(self._tiles):
-            row = i // self._cols
-            col = i % self._cols
-            self._grid_layout.addWidget(tile, row, col)
+        self._update_thumbnail_grid()
 
         if self._tiles:
             self._tiles[0].set_selected(True)

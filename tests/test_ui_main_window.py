@@ -4,12 +4,13 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 from pytest import MonkeyPatch
 
 from acteo.classifier import ClassificationResult
-from acteo.image_viewer import ImageTile
+from acteo.image_viewer import ImageTile, ImageViewer
 from acteo.main_window import MainWindow
 from acteo.sequence_loader import Sequence
 from acteo.settings import Settings
@@ -84,6 +85,46 @@ def test_thumbnail_tile_size_matches_thumbnail_dimensions(tmp_path: Path) -> Non
 
     assert tile._display_label.size().height() == 130
     assert tile._display_label.size().width() == 130
+
+
+def test_sequence_tiles_fill_available_width_and_height(tmp_path: Path) -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    img1 = tmp_path / "seq_1.jpg"
+    img2 = tmp_path / "seq_2.jpg"
+    img3 = tmp_path / "seq_3.jpg"
+    for img in (img1, img2, img3):
+        img.write_bytes(b"\xff\xd8\xff\xd9")
+
+    viewer = ImageViewer()
+    viewer.resize(600, 220)
+    viewer.set_sequence("seq-test", [str(img1), str(img2), str(img3)])
+
+    expected_height = viewer._scroll.viewport().height()
+    widths = [tile.width() for tile in viewer._tiles]
+    heights = [tile.height() for tile in viewer._tiles]
+
+    assert max(widths) - min(widths) <= 1
+    assert len({*heights}) == 1
+    assert heights[0] == expected_height
+    assert sum(widths) == viewer._scroll.viewport().width()
+
+
+def test_thumbnail_tile_preserves_original_aspect_ratio() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    tile = ImageTile("example.jpg", 0, size=130, cache=ThumbnailCache())
+    portrait = QPixmap(100, 220)
+
+    scaled = tile._scaled_for_tile(portrait)
+
+    assert scaled.width() <= tile.tile_width
+    assert scaled.height() <= tile.tile_height
+    assert abs((scaled.width() / scaled.height()) - (portrait.width() / portrait.height())) < 0.05
 
 
 def test_main_window_discard_sequence_moves_files_and_supports_undo(
