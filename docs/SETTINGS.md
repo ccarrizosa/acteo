@@ -20,17 +20,20 @@ Folders
 Grouping
 --------
 - grouping_mode
-  Controls how images are grouped into sequences. Options:
+  Controls how images are grouped into sequences. Supported values:
   - `timestamp_gap`: images with timestamps within `timestamp_gap_seconds` are
     grouped together (recommended for trail cams).
-  - `manual`: no automatic grouping; the user forms sequences manually.
-  - `filename_pattern`: group by filename ordering or configured pattern.
+  - `fixed_size`: images are grouped into consecutive batches of
+    `fixed_group_size` images.
 
 - timestamp_gap_seconds
   The maximum allowed time difference (in seconds) for two images to be
   considered part of the same sequence when `grouping_mode` is
   `timestamp_gap`. Typical values are 5–30 for burst images; larger values
   combine images taken farther apart in time.
+
+- fixed_group_size
+  Number of images per sequence when `grouping_mode` is `fixed_size`.
 
 Presentation
 ------------
@@ -71,6 +74,10 @@ IO & behavior
 -------------
 - concurrency
   Number of concurrent workers for IO-bound tasks (thumbnailing, move/copy).
+
+- autoplay_interval_seconds
+  Number of seconds between automatic image changes while previewing a
+  sequence in the viewer.
 
 - exif_priority
   If true, use EXIF DateTimeOriginal for image timestamps when available.

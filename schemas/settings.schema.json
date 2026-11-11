@@ -7,8 +7,10 @@
     "output_folder": { "type": ["string", "null"] },
     "discard_folder": { "type": ["string", "null"] },
 
-    "grouping_mode": { "type": "string", "enum": ["timestamp_gap", "manual", "filename_pattern"] },
+    "grouping_mode": { "type": "string", "enum": ["timestamp_gap", "fixed_size"] },
     "timestamp_gap_seconds": { "type": "integer", "minimum": 0 },
+    "fixed_group_size": { "type": "integer", "minimum": 1 },
+    "autoplay_interval_seconds": { "type": "integer", "minimum": 1 },
 
     "images_per_sequence": { "type": "integer", "minimum": 1 },
 
@@ -27,6 +29,6 @@
     "operator_name": { "type": ["string", "null"] },
     "last_scanned": { "type": ["string", "null"], "format": "date-time" }
   },
-  "required": ["grouping_mode", "timestamp_gap_seconds", "images_per_sequence", "move_mode"],
+  "required": ["grouping_mode", "timestamp_gap_seconds", "fixed_group_size", "autoplay_interval_seconds", "images_per_sequence", "move_mode"],
   "additionalProperties": false
 }

@@ -4,9 +4,26 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, List, Optional
 
+import jsonschema
+
 DEFAULT_CONFIG_NAME = "acteo_settings.json"
+
+SETTINGS_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "settings.schema.json"
+
+
+def _load_schema() -> dict[str, Any]:
+    with SETTINGS_SCHEMA_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def validate_settings_data(data: dict[str, Any]) -> None:
+    try:
+        jsonschema.validate(data, _load_schema())
+    except jsonschema.ValidationError as exc:
+        raise ValueError(f"Invalid settings: {exc.message}") from exc
 
 @dataclass
 class Settings:
@@ -25,8 +42,6 @@ class Settings:
             `timestamp_gap_seconds`.
         * "fixed_size": group images into consecutive batches of
             `fixed_group_size`.
-        * "manual": no automatic grouping, sequences are formed manually by user.
-        * "filename_pattern": group by filename ordering/patterns.
     - timestamp_gap_seconds: Number of seconds used when `grouping_mode` is
         "timestamp_gap". Two images whose timestamps differ by <= this value are
         considered part of the same sequence. Use a small value (e.g. 5–30) for
@@ -71,9 +86,7 @@ class Settings:
     discard_folder: Optional[str] = None
 
     # Grouping
-    grouping_mode: str = (
-        "timestamp_gap"  # timestamp_gap | fixed_size | manual | filename_pattern
-    )
+    grouping_mode: str = "timestamp_gap"  # timestamp_gap | fixed_size
     timestamp_gap_seconds: int = 10
     fixed_group_size: int = 3
 
@@ -109,6 +122,11 @@ class Settings:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Settings":
+        defaults = cls().to_dict()
+        merged = defaults.copy()
+        merged.update(d)
+        d = merged
+
         # Basic normalization
         if "timestamp_gap_seconds" in d:
             try:
@@ -135,17 +153,21 @@ class Settings:
         if "grouping_mode" in d and d["grouping_mode"] not in {
             "timestamp_gap",
             "fixed_size",
-            "manual",
-            "filename_pattern",
         }:
-            d["grouping_mode"] = cls().grouping_mode
+            raise ValueError(
+                "Unsupported grouping_mode. Supported values are: "
+                "'timestamp_gap' and 'fixed_size'."
+            )
+        validate_settings_data(d)
         return cls(**d)
 
     def save(self, path: Optional[str] = None) -> None:
         path = path or default_config_path()
+        payload = self.to_dict()
+        validate_settings_data(payload)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+            json.dump(payload, f, indent=2, ensure_ascii=False)
 
     @classmethod
     def load(cls, path: Optional[str] = None) -> "Settings":
@@ -154,8 +176,14 @@ class Settings:
             return cls()
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        s = cls.from_dict(data)
-        return s
+
+        settings = cls.from_dict(data)
+        normalized = settings.to_dict()
+        if data != normalized:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(normalized, f, indent=2, ensure_ascii=False)
+        return settings
 
     def update_last_scanned(self) -> None:
         self.last_scanned = datetime.utcnow().isoformat()
