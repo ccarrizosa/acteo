@@ -7,7 +7,6 @@ import pytest
 from acteo.i18n import get_locale, set_locale, t
 from acteo.settings import Settings
 
-
 REQUIRED_KEYS = [
     "app_title",
     "settings.title",

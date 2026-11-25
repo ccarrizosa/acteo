@@ -32,7 +32,7 @@ from typing_extensions import override
 
 from .categories import load_categories, save_categories
 from .classifier import Classifier
-from .i18n import get_locale, set_locale, t
+from .i18n import set_locale, t
 from .image_viewer import ImageViewer
 from .logger import export_sequence_report
 from .sequence_loader import (

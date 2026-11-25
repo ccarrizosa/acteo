@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import jsonschema
 
@@ -15,7 +15,7 @@ SETTINGS_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "settin
 
 def _load_schema() -> dict[str, Any]:
     with SETTINGS_SCHEMA_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 def validate_settings_data(data: dict[str, Any]) -> None:

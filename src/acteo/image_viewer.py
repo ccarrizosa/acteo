@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -23,7 +23,7 @@ from .i18n import t
 from .thumbnail_cache import ThumbnailCache
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QMouseEvent, QResizeEvent
+    from PySide6.QtGui import QMouseEvent, QResizeEvent, QShowEvent
 
 
 class ImageTile(QWidget):
@@ -272,7 +272,7 @@ class ImageViewer(QWidget):
         self._update_selected_preview()
 
     @override
-    def showEvent(self, event: QShowEvent) -> None:  # type: ignore[name-defined]
+    def showEvent(self, event: QShowEvent) -> None:
         """Refresh thumbnail sizing once the widget is actually visible."""
         super().showEvent(event)
         QTimer.singleShot(0, self._update_thumbnail_grid)

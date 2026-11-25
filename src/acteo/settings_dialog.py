@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .i18n import t, set_locale
+from .i18n import set_locale, t
 from .settings import Settings, default_config_path, ensure_paths
 
 
