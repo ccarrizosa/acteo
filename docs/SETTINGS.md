@@ -75,6 +75,16 @@ Operator & Misc
 - operator_name
   Optional human-readable name of the operator; recorded in metadata.
 
+- locale
+  User interface language for Acteo. Supported values are `en` (English),
+  `es` (Español), and `ca` (Català). The default value is `en`.
+
+  Locale selection is normalized through the active translation layer: invalid
+  or unknown values automatically fall back to English. In the current
+  implementation, when the user changes the language in the settings dialog and
+  accepts it, the active window refreshes immediately to use the new locale
+  without requiring a manual restart.
+
 Notes
 -----
 - All path settings accept `~` and will be expanded to absolute paths by the

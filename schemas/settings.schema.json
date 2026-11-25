@@ -20,6 +20,7 @@
     "thumbnails_cache_dir": { "type": ["string", "null"] },
 
     "exif_priority": { "type": "boolean" },
+    "locale": { "type": "string", "enum": ["en", "es", "ca"] },
 
     "operator_name": { "type": ["string", "null"] }
   },

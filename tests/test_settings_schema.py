@@ -71,6 +71,47 @@ def test_settings_load_applies_defaults_and_persists_missing_legacy_key(
     assert json.loads(config_path.read_text(encoding="utf-8"))["autoplay_interval_seconds"] == 1
 
 
+def test_settings_load_accepts_valid_locale_value(tmp_path: Path) -> None:
+    config_path = tmp_path / "settings.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "grouping_mode": "fixed_size",
+                "timestamp_gap_seconds": 12,
+                "move_mode": "move",
+                "fixed_group_size": 5,
+                "autoplay_interval_seconds": 2,
+                "locale": "es",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    settings = Settings.load(str(config_path))
+
+    assert settings.locale == "es"
+
+
+def test_settings_load_rejects_unsupported_locale_value(tmp_path: Path) -> None:
+    config_path = tmp_path / "settings.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "grouping_mode": "fixed_size",
+                "timestamp_gap_seconds": 12,
+                "move_mode": "move",
+                "fixed_group_size": 5,
+                "autoplay_interval_seconds": 2,
+                "locale": "fr",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        Settings.load(str(config_path))
+
+
 def test_settings_load_ignores_unknown_keys(tmp_path: Path) -> None:
     config_path = tmp_path / "settings.json"
     config_path.write_text(

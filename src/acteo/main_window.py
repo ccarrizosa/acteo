@@ -32,6 +32,7 @@ from typing_extensions import override
 
 from .categories import load_categories, save_categories
 from .classifier import Classifier
+from .i18n import get_locale, set_locale, t
 from .image_viewer import ImageViewer
 from .logger import export_sequence_report
 from .sequence_loader import (
@@ -73,6 +74,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__(parent)
         self.settings = settings
+        set_locale(getattr(self.settings, "locale", None))
         self._sequences = sequences or []
         self._current_sequence_index = 0
         self._classifier: Optional[Classifier] = None
@@ -84,8 +86,18 @@ class MainWindow(QMainWindow):
         self._autoplay_timer.timeout.connect(self._advance_autoplay)
         self._is_playing = False
         self._play_pause_action: Optional[QAction] = None
+        self._open_folder_action: Optional[QAction] = None
+        self._settings_action: Optional[QAction] = None
+        self._export_action: Optional[QAction] = None
+        self._previous_action: Optional[QAction] = None
+        self._next_action: Optional[QAction] = None
+        self._add_category_button: Optional[QPushButton] = None
+        self._rename_category_button: Optional[QPushButton] = None
+        self._remove_category_button: Optional[QPushButton] = None
+        self._discard_sequence_button: Optional[QPushButton] = None
+        self._undo_button: Optional[QPushButton] = None
 
-        self.setWindowTitle("Acteo — Trail Camera Image Classifier")
+        self.setWindowTitle(t("app_title"))
         self.setGeometry(100, 100, 1400, 900)
 
         self._init_ui()
@@ -125,28 +137,28 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self._category_container)
 
         # Add/Rename/Remove category buttons
-        add_cat_btn = QPushButton("+ Add Category")
-        add_cat_btn.clicked.connect(self._add_category)
-        right_layout.addWidget(add_cat_btn)
+        self._add_category_button = QPushButton(t("main.add_category"))
+        self._add_category_button.clicked.connect(self._add_category)
+        right_layout.addWidget(self._add_category_button)
 
-        rename_cat_btn = QPushButton("Rename Category")
-        rename_cat_btn.clicked.connect(self._rename_category_prompt)
-        right_layout.addWidget(rename_cat_btn)
+        self._rename_category_button = QPushButton(t("main.rename_category"))
+        self._rename_category_button.clicked.connect(self._rename_category_prompt)
+        right_layout.addWidget(self._rename_category_button)
 
-        remove_cat_btn = QPushButton("- Remove Category")
-        remove_cat_btn.clicked.connect(self._remove_category)
-        right_layout.addWidget(remove_cat_btn)
+        self._remove_category_button = QPushButton(t("main.remove_category"))
+        self._remove_category_button.clicked.connect(self._remove_category)
+        right_layout.addWidget(self._remove_category_button)
 
         # Discard button
-        discard_btn = QPushButton("Discard Sequence")
-        discard_btn.setStyleSheet("background-color: #f44336; color: white;")
-        discard_btn.clicked.connect(self._discard_sequence)
-        right_layout.addWidget(discard_btn)
+        self._discard_sequence_button = QPushButton(t("main.discard_sequence"))
+        self._discard_sequence_button.setStyleSheet("background-color: #f44336; color: white;")
+        self._discard_sequence_button.clicked.connect(self._discard_sequence)
+        right_layout.addWidget(self._discard_sequence_button)
 
         # Undo button
-        undo_btn = QPushButton("Undo")
-        undo_btn.clicked.connect(self._undo_action)
-        right_layout.addWidget(undo_btn)
+        self._undo_button = QPushButton(t("main.undo"))
+        self._undo_button.clicked.connect(self._undo_action)
+        right_layout.addWidget(self._undo_button)
 
         right_layout.addStretch()
         main_layout.addWidget(right_panel, 1)
@@ -155,47 +167,82 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar()
         self.addToolBar(toolbar)
 
-        open_btn = toolbar.addAction("Open Folder")
-        open_btn.triggered.connect(self._open_folder)
+        self._open_folder_action = toolbar.addAction(t("main.open_folder"))
+        self._open_folder_action.triggered.connect(self._open_folder)
 
-        settings_btn = toolbar.addAction("Settings")
-        settings_btn.triggered.connect(self._show_settings)
+        self._settings_action = toolbar.addAction(t("main.settings"))
+        self._settings_action.triggered.connect(self._show_settings)
 
-        export_btn = toolbar.addAction("Export Report")
-        export_btn.triggered.connect(self._export_report)
+        self._export_action = toolbar.addAction(t("main.export_report"))
+        self._export_action.triggered.connect(self._export_report)
 
         toolbar.addSeparator()
 
-        prev_btn = toolbar.addAction("< Previous")
-        prev_btn.triggered.connect(self._previous_sequence)
+        self._previous_action = toolbar.addAction(t("main.previous"))
+        self._previous_action.triggered.connect(self._previous_sequence)
 
-        next_btn = toolbar.addAction("Next >")
-        next_btn.triggered.connect(self._next_sequence)
+        self._next_action = toolbar.addAction(t("main.next"))
+        self._next_action.triggered.connect(self._next_sequence)
 
-        self._play_pause_action = toolbar.addAction("▶ Play")
+        self._play_pause_action = toolbar.addAction(t("main.play"))
         self._play_pause_action.triggered.connect(self._toggle_play_pause)
         self._apply_play_pause_icon()
 
         # Status bar
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
-        self._status_label = QLabel("Ready")
+        self._status_label = QLabel(t("main.ready"))
         self._status_bar.addWidget(self._status_label)
+
+    def _apply_locale(self) -> None:
+        """Apply the active locale and refresh all translatable labels in the window."""
+        set_locale(getattr(self.settings, "locale", None))
+        self.setWindowTitle(t("app_title"))
+
+        if self._open_folder_action is not None:
+            self._open_folder_action.setText(t("main.open_folder"))
+        if self._settings_action is not None:
+            self._settings_action.setText(t("main.settings"))
+        if self._export_action is not None:
+            self._export_action.setText(t("main.export_report"))
+        if self._previous_action is not None:
+            self._previous_action.setText(t("main.previous"))
+        if self._next_action is not None:
+            self._next_action.setText(t("main.next"))
+        if self._add_category_button is not None:
+            self._add_category_button.setText(t("main.add_category"))
+        if self._rename_category_button is not None:
+            self._rename_category_button.setText(t("main.rename_category"))
+        if self._remove_category_button is not None:
+            self._remove_category_button.setText(t("main.remove_category"))
+        if self._discard_sequence_button is not None:
+            self._discard_sequence_button.setText(t("main.discard_sequence"))
+        if self._undo_button is not None:
+            self._undo_button.setText(t("main.undo"))
+
+        self._apply_play_pause_icon()
+        if hasattr(self, "_status_label") and self._status_label is not None:
+            self._status_label.setText(t("main.ready"))
+
+        if hasattr(self, "_image_viewer"):
+            self._image_viewer.apply_locale()
+        self._refresh_sequence_list()
 
     def _rebuild_sequences_for_current_settings(self) -> None:
         """Re-scan the current input folder using the active grouping settings."""
         folder = getattr(self.settings, "input_folder", None)
         if not folder:
-            self._status_label.setText("No input folder selected")
+            self._status_label.setText(t("main.no_input_folder"))
             return
 
         if not Path(folder).exists() or not Path(folder).is_dir():
-            self._status_label.setText(f"Input folder is missing or invalid: {folder}")
+            self._status_label.setText(
+                f"{t('main.input_folder_invalid')}: {folder}"
+            )
             QMessageBox.warning(
                 self,
-                "Invalid input folder",
-                "The selected input folder does not exist or is not a directory: "
-                f"{folder}",
+                t("main.invalid_input_folder"),
+                f"{t('main.invalid_input_folder_message')}: {folder}",
             )
             return
 
@@ -204,8 +251,8 @@ class MainWindow(QMainWindow):
             self._sequences = []
             self._image_viewer.set_sequence("empty", [])
             self._refresh_sequence_list()
-            self._status_label.setText(f"No images found in {folder}")
-            self._status_bar.showMessage(f"No images found in {folder}", 4000)
+            self._status_label.setText(f"{t('main.no_images_found')} in {folder}")
+            self._status_bar.showMessage(f"{t('main.no_images_found')} in {folder}", 4000)
             return
 
         gap_seconds = getattr(self.settings, "timestamp_gap_seconds", 10)
@@ -227,12 +274,14 @@ class MainWindow(QMainWindow):
         if self._sequences:
             self._display_sequence(0)
         self._status_label.setText(
-            f"Loaded {len(self._sequences)} sequences from {folder}"
+            t("main.loaded_sequences").format(
+                count=len(self._sequences), folder=folder
+            )
         )
 
     def _open_folder(self) -> None:
         """Open a folder and scan for images."""
-        folder = QFileDialog.getExistingDirectory(self, "Select Input Folder")
+        folder = QFileDialog.getExistingDirectory(self, t("main.select_input_folder"))
         if not folder:
             return
 
@@ -244,8 +293,9 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self.settings, parent=self)
         if dialog.exec() == dialog.DialogCode.Accepted:
             self.settings = dialog.settings
+            self._apply_locale()
             self._rebuild_sequences_for_current_settings()
-            self._status_label.setText("Settings updated")
+            self._status_label.setText(t("main.settings_updated"))
 
     def set_sequences(self, sequences: List[Sequence]) -> None:
         """Set the sequences to display.
@@ -263,9 +313,11 @@ class MainWindow(QMainWindow):
         """Refresh the left panel sequence list."""
         self._sequence_list.clear()
         for seq in self._sequences:
-            label = f"Seq {seq.id}: {len(seq.image_paths)} images"
+            label = t("main.sequence_label").format(
+                id=seq.id, count=len(seq.image_paths)
+            )
             if seq.is_classified:
-                category_label = seq.category or "classified"
+                category_label = seq.category or t("main.sequence_classified")
                 label = f"{label} [classified: {category_label}]"
             item = QListWidgetItem(label)
             self._sequence_list.addItem(item)
@@ -287,8 +339,12 @@ class MainWindow(QMainWindow):
         seq = self._sequences[index]
         self._image_viewer.set_sequence(seq.id, seq.image_paths)
         self._status_label.setText(
-            f"Sequence {seq.id}: {len(seq.image_paths)} images "
-            f"[{seq.start_ts} to {seq.end_ts}]"
+            t("main.sequence_count_msg").format(
+                id=seq.id,
+                count=len(seq.image_paths),
+                start=seq.start_ts,
+                end=seq.end_ts,
+            )
         )
 
     def _previous_sequence(self) -> None:
@@ -307,7 +363,10 @@ class MainWindow(QMainWindow):
 
     def _on_image_selected(self, sequence_id: str, index: int) -> None:
         """Handle image selection in viewer."""
-        msg = f"Selected image {index} from sequence {sequence_id}"
+        msg = t("main.selected_image_msg").format(
+            index=index,
+            sequence_id=sequence_id,
+        )
         self._status_label.setText(msg)
 
     def _apply_play_pause_icon(self) -> None:
@@ -316,16 +375,16 @@ class MainWindow(QMainWindow):
             return
 
         if self._is_playing:
-            self._play_pause_action.setText("❚❚ Pause")
-            self._play_pause_action.setToolTip("Pause autoplay")
+            self._play_pause_action.setText(t("main.pause"))
+            self._play_pause_action.setToolTip(t("main.pause_autoplay_tooltip"))
             icon = QIcon.fromTheme("media-playback-pause")
             if icon.isNull():
                 icon = QIcon.fromTheme("media-playback-pause-symbolic")
             if not icon.isNull():
                 self._play_pause_action.setIcon(icon)
         else:
-            self._play_pause_action.setText("▶ Play")
-            self._play_pause_action.setToolTip("Play autoplay")
+            self._play_pause_action.setText(t("main.play"))
+            self._play_pause_action.setToolTip(t("main.play_autoplay_tooltip"))
             icon = QIcon.fromTheme("media-playback-start")
             if icon.isNull():
                 icon = QIcon.fromTheme("media-playback-start-symbolic")
@@ -341,7 +400,7 @@ class MainWindow(QMainWindow):
             self._autoplay_timer.stop()
             self._is_playing = False
             self._apply_play_pause_icon()
-            self._status_label.setText("Autoplay paused")
+            self._status_label.setText(t("main.autoplay_paused"))
             return
 
         interval_seconds = int(
@@ -352,7 +411,7 @@ class MainWindow(QMainWindow):
         self._autoplay_timer.start()
         self._is_playing = True
         self._apply_play_pause_icon()
-        self._status_label.setText("Autoplay playing")
+        self._status_label.setText(t("main.autoplay_playing"))
 
     def _advance_autoplay(self) -> None:
         """Move to the next image in the active sequence when autoplay is running."""
@@ -396,15 +455,19 @@ class MainWindow(QMainWindow):
 
     def _add_category(self) -> None:
         """Add a new category."""
-        name, ok = QInputDialog.getText(self, "New Category", "Enter category name:")
+        name, ok = QInputDialog.getText(
+            self,
+            t("main.new_category"),
+            t("main.category_name_prompt"),
+        )
         if not ok or not name:
             return
         clean_name = str(name).strip()
         if not clean_name:
             QMessageBox.warning(
                 self,
-                "Invalid Category",
-                "Category name cannot be empty",
+                t("main.invalid_category"),
+                t("main.category_empty"),
             )
             return
         if any(
@@ -413,8 +476,8 @@ class MainWindow(QMainWindow):
         ):
             QMessageBox.warning(
                 self,
-                "Duplicate Category",
-                f"{clean_name} already exists",
+                t("main.duplicate_category"),
+                f"{clean_name} {t('main.category_exists')}",
             )
             return
         cat_id = f"cat_{len(self._categories)}"
@@ -425,16 +488,26 @@ class MainWindow(QMainWindow):
     def _rename_category_prompt(self) -> None:
         """Rename a selected category via dialog."""
         if not self._categories:
-            QMessageBox.warning(self, "No Categories", "No categories to rename")
+            QMessageBox.warning(
+                self,
+                t("main.no_categories"),
+                t("main.no_categories_to_rename"),
+            )
             return
         names = [str(cat.get("name", "")) for cat in self._categories]
         old_name, ok = QInputDialog.getItem(
-            self, "Rename Category", "Select category to rename:", names
+            self,
+            t("main.rename_category"),
+            t("main.rename_category_prompt"),
+            names,
         )
         if not ok or not old_name:
             return
         new_name, ok_new = QInputDialog.getText(
-            self, "Rename Category", "New category name:", text=str(old_name)
+            self,
+            t("main.rename_category"),
+            t("main.rename_category_new_name"),
+            text=str(old_name),
         )
         if ok_new and new_name:
             self._rename_category(str(old_name), str(new_name))
@@ -452,8 +525,8 @@ class MainWindow(QMainWindow):
         ):
             QMessageBox.warning(
                 self,
-                "Duplicate Category",
-                f"{clean_new} already exists",
+                t("main.duplicate_category"),
+                f"{clean_new} {t('main.category_exists')}",
             )
             return
         for cat in self._categories:
@@ -466,13 +539,20 @@ class MainWindow(QMainWindow):
     def _remove_category(self, category_name: Optional[str] = None) -> None:
         """Remove a category."""
         if not self._categories:
-            QMessageBox.warning(self, "No Categories", "No categories to remove")
+            QMessageBox.warning(
+                self,
+                t("main.no_categories"),
+                t("main.no_categories_to_remove"),
+            )
             return
 
         if category_name is None:
             names = [str(c.get("name", "")) for c in self._categories]
             name, ok = QInputDialog.getItem(
-                self, "Remove Category", "Select category:", names
+                self,
+                t("main.remove_category"),
+                t("main.remove_category_prompt"),
+                names,
             )
             if not ok or not name:
                 return
@@ -546,14 +626,14 @@ class MainWindow(QMainWindow):
         if not self._classification_rows:
             QMessageBox.information(
                 self,
-                "No report data",
-                "There are no classified sequences to export yet.",
+                t("main.export_no_data"),
+                t("main.export_no_data_message"),
             )
             return
 
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Export classification report",
+            t("main.export_title"),
             str(Path.home() / "acteo_report.csv"),
             "CSV files (*.csv)",
         )
@@ -562,9 +642,9 @@ class MainWindow(QMainWindow):
 
         try:
             export_sequence_report(path, self._classification_rows)
-            self._status_label.setText(f"Exported report to {path}")
+            self._status_label.setText(t("main.export_success").format(path=path))
         except Exception as exc:  # pragma: no cover - defensive UX path
-            QMessageBox.critical(self, "Export Failed", str(exc))
+            QMessageBox.critical(self, t("main.export_failed"), str(exc))
             logger.exception("Failed to export report: %s", exc)
 
     def _validate_output_folder_for_classification(self) -> Optional[Path]:
@@ -573,8 +653,8 @@ class MainWindow(QMainWindow):
         if not output_folder:
             QMessageBox.warning(
                 self,
-                "Output folder missing",
-                "Configure an output folder in settings before classifying images.",
+                t("main.output_folder_missing"),
+                t("main.output_folder_missing_message"),
             )
             return None
 
@@ -582,8 +662,8 @@ class MainWindow(QMainWindow):
         if path.exists() and not path.is_dir():
             QMessageBox.warning(
                 self,
-                "Invalid output folder",
-                f"The output folder is invalid: {output_folder}",
+                t("main.invalid_output_folder"),
+                f"{t('main.invalid_output_folder_message')}: {output_folder}",
             )
             return None
 
@@ -595,8 +675,8 @@ class MainWindow(QMainWindow):
         if not discard_folder:
             QMessageBox.warning(
                 self,
-                "Discard folder missing",
-                "Configure a discard folder in settings before discarding images.",
+                t("main.discard_folder_missing"),
+                t("main.discard_folder_missing_message"),
             )
             return None
 
@@ -604,8 +684,8 @@ class MainWindow(QMainWindow):
         if path.exists() and not path.is_dir():
             QMessageBox.warning(
                 self,
-                "Invalid discard folder",
-                f"The discard folder is invalid: {discard_folder}",
+                t("main.invalid_discard_folder"),
+                f"{t('main.invalid_discard_folder_message')}: {discard_folder}",
             )
             return None
 
@@ -620,7 +700,9 @@ class MainWindow(QMainWindow):
         """
         if not self._classifier:
             QMessageBox.warning(
-                self, "Not Ready", "Classifier not yet initialized"
+                self,
+                t("main.not_ready"),
+                t("main.classifier_uninitialized"),
             )
             return
 
@@ -655,14 +737,17 @@ class MainWindow(QMainWindow):
             self._undo_stack.push(action)
 
             self._status_label.setText(
-                f"Classified sequence {seq.id} as {category_name}"
+                t("main.classified_sequence").format(
+                    sequence_id=seq.id,
+                    category=category_name,
+                )
             )
             self._refresh_sequence_list()
 
             # Move to next sequence
             self._next_sequence()
         except Exception as e:
-            QMessageBox.critical(self, "Classification Error", str(e))
+            QMessageBox.critical(self, t("main.classification_error"), str(e))
             logger.exception("Failed to classify sequence: %s", e)
 
     def _skip_selected_images(self) -> None:
@@ -688,10 +773,14 @@ class MainWindow(QMainWindow):
         if not skipped_paths:
             return
 
-        discard_mode = "move to discard folder" if self.settings.safe_delete else "permanently delete"
+        discard_mode = (
+            t("main.discard_mode_move")
+            if self.settings.safe_delete or bool(discard_folder)
+            else t("main.discard_mode_delete")
+        )
         reply = QMessageBox.question(
             self,
-            "Confirm Skip",
+            t("main.confirm_skip"),
             (
                 f"{discard_mode.capitalize()} {len(skipped_paths)} image(s) from sequence {seq.id}?"
             ),
@@ -701,7 +790,12 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            dest_paths = bulk_skip(skipped_paths, str(discard_folder), safe=self.settings.safe_delete)
+            use_safe_delete = self.settings.safe_delete or bool(discard_folder)
+            dest_paths = bulk_skip(
+                skipped_paths,
+                str(discard_folder),
+                safe=use_safe_delete,
+            )
             remaining_paths = [path for path in all_paths if path not in skipped_paths]
             self._sequences[self._current_sequence_index] = Sequence(
                 id=seq.id,
@@ -720,7 +814,10 @@ class MainWindow(QMainWindow):
                 )
             )
             self._status_label.setText(
-                f"Skipped {len(skipped_paths)} image(s) from sequence {seq.id}"
+                t("main.sequence_skipped").format(
+                    count=len(skipped_paths),
+                    sequence_id=seq.id,
+                )
             )
             self._refresh_sequence_list()
             if remaining_paths:
@@ -728,7 +825,7 @@ class MainWindow(QMainWindow):
             else:
                 self._next_sequence()
         except Exception as exc:  # pragma: no cover - defensive UX path
-            QMessageBox.critical(self, "Skip Failed", str(exc))
+            QMessageBox.critical(self, t("main.skip_failed"), str(exc))
             logger.exception("Failed to skip files from sequence %s: %s", seq.id, exc)
 
     def _discard_sequence(self) -> None:
@@ -737,10 +834,14 @@ class MainWindow(QMainWindow):
             return
 
         seq = self._sequences[self._current_sequence_index]
-        discard_mode = "discard" if self.settings.safe_delete else "permanently delete"
+        discard_mode = (
+            t("main.discard_mode_discard")
+            if self.settings.safe_delete
+            else t("main.discard_mode_delete")
+        )
         reply = QMessageBox.question(
             self,
-            "Confirm Discard",
+            t("main.confirm_discard"),
             f"{discard_mode.capitalize()} sequence {seq.id} ({len(seq.image_paths)} images)?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -749,10 +850,10 @@ class MainWindow(QMainWindow):
 
         original_paths = list(seq.image_paths)
         dest_paths: list[str] = []
-        if self.settings.safe_delete:
-            discard_folder = self._validate_discard_folder_for_action()
-            if discard_folder is None:
-                return
+        discard_folder = self._validate_discard_folder_for_action()
+        if discard_folder is None:
+            return
+        if self.settings.safe_delete or bool(discard_folder):
             try:
                 discard_files(original_paths, str(discard_folder), safe=True)
                 discard_root = Path(discard_folder)
@@ -760,14 +861,14 @@ class MainWindow(QMainWindow):
                     src_path = Path(str(src))
                     dest_paths.append(str(discard_root / src_path.name))
             except Exception as exc:  # pragma: no cover - defensive UX path
-                QMessageBox.critical(self, "Discard Failed", str(exc))
+                QMessageBox.critical(self, t("main.discard_failed"), str(exc))
                 logger.exception("Failed to discard sequence %s: %s", seq.id, exc)
                 return
         else:
             try:
                 discard_files(original_paths, str(Path(".")), safe=False)
             except Exception as exc:  # pragma: no cover - defensive UX path
-                QMessageBox.critical(self, "Discard Failed", str(exc))
+                QMessageBox.critical(self, t("main.discard_failed"), str(exc))
                 logger.exception("Failed to discard sequence %s: %s", seq.id, exc)
                 return
 
@@ -782,10 +883,12 @@ class MainWindow(QMainWindow):
                 operator=getattr(self.settings, "operator_name", "unknown"),
             )
             self._undo_stack.push(action)
-            self._status_label.setText(f"Discarded sequence {seq.id}")
+            self._status_label.setText(
+                t("main.discarded_sequence").format(sequence_id=seq.id)
+            )
             self._next_sequence()
         except Exception as exc:  # pragma: no cover - defensive UX path
-            QMessageBox.critical(self, "Discard Failed", str(exc))
+            QMessageBox.critical(self, t("main.discard_failed"), str(exc))
             logger.exception("Failed to discard sequence %s: %s", seq.id, exc)
 
     def _restore_sequence_paths_after_undo(self, action: Action) -> None:
@@ -814,14 +917,20 @@ class MainWindow(QMainWindow):
     def _undo_action(self) -> None:
         """Undo the most recent action."""
         if not self._undo_stack.can_undo():
-            QMessageBox.information(self, "No Action", "Nothing to undo")
+            QMessageBox.information(
+                self,
+                t("main.no_action"),
+                t("main.nothing_to_undo"),
+            )
             return
 
         action = self._undo_stack.pop()
         if action:
             self._undo_stack.reverse_action(action)
             self._restore_sequence_paths_after_undo(action)
-            self._status_label.setText(f"Undid action on sequence {action.sequence_id}")
+            self._status_label.setText(
+                t("main.undoed_action").format(sequence_id=action.sequence_id)
+            )
 
     @override
     def keyPressEvent(self, event: QKeyEvent) -> None:

@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
+from acteo.i18n import get_locale, set_locale, t
 from acteo.settings import Settings
 from acteo.settings_dialog import SettingsDialog
 
@@ -51,6 +52,43 @@ def test_settings_dialog_saves_and_applies_values(tmp_path: Path) -> None:
     assert payload["grouping_mode"] == "fixed_size"
     assert payload["fixed_group_size"] == 5
     assert payload["move_mode"] == "copy"
+
+
+def test_settings_dialog_save_and_load_locale(tmp_path: Path) -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    settings = Settings(locale="ca")
+    dialog = SettingsDialog(settings, config_path=str(tmp_path / "settings.json"))
+
+    assert dialog.locale_combo.currentText() == "Català"
+
+    dialog.locale_combo.setCurrentText("Español")
+    dialog.apply_to_settings()
+
+    assert settings.locale == "es"
+    payload = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
+    assert payload["locale"] == "es"
+
+
+def test_settings_dialog_translates_labels_for_supported_locales() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    for locale in ("en", "es", "ca"):
+        set_locale(locale)
+        settings = Settings(locale=locale)
+        dialog = SettingsDialog(settings)
+
+        label_texts = {label.text() for label in dialog.findChildren(QLabel)}
+        button_texts = {button.text() for button in dialog.findChildren(QPushButton)}
+
+        assert dialog.windowTitle() == t("settings.title", locale=locale)
+        assert t("settings.input_folder", locale=locale) in label_texts
+        assert t("settings.browse", locale=locale) in button_texts
+        assert get_locale() == locale
 
 
 def test_settings_dialog_saves_missing_optional_settings(tmp_path: Path) -> None:

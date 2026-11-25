@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .i18n import t, set_locale
 from .settings import Settings, default_config_path, ensure_paths
 
 
@@ -34,12 +35,13 @@ class SettingsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.settings = settings
+        set_locale(self.settings.locale)
         self.config_path = config_path or default_config_path()
         self._init_ui()
         self.load_from_settings(settings)
 
     def _init_ui(self) -> None:
-        self.setWindowTitle("Acteo settings")
+        self.setWindowTitle(t("settings.title"))
         self.resize(620, 280)
 
         layout = QVBoxLayout(self)
@@ -66,6 +68,9 @@ class SettingsDialog(QDialog):
         self.move_mode_combo = QComboBox()
         self.move_mode_combo.addItems(["move", "copy"])
 
+        self.locale_combo = QComboBox()
+        self.locale_combo.addItems(["English", "Español", "Català"])
+
         self.safe_delete_check = QCheckBox()
         self.category_file_edit = QLineEdit()
         self.metadata_file_edit = QLineEdit()
@@ -73,20 +78,21 @@ class SettingsDialog(QDialog):
         self.operator_name_edit = QLineEdit()
 
         for label, widget in (
-            ("Input folder", self._make_browse_widget(self.input_folder_edit)),
-            ("Output folder", self._make_browse_widget(self.output_folder_edit)),
-            ("Discard folder", self._make_browse_widget(self.discard_folder_edit)),
-            ("Grouping mode", self.grouping_mode_combo),
-            ("Timestamp gap (s)", self.timestamp_gap_spin),
-            ("Autoplay interval (s)", self.autoplay_interval_spin),
-            ("Fixed group size", self.fixed_group_size_spin),
-            ("Prefer EXIF timestamps", self.exif_priority_check),
-            ("Move mode", self.move_mode_combo),
-            ("Safe delete", self.safe_delete_check),
-            ("Category file", self._make_browse_widget(self.category_file_edit, is_file=True)),
-            ("Metadata file", self._make_browse_widget(self.metadata_file_edit, is_file=True)),
-            ("Thumbnails cache dir", self._make_browse_widget(self.thumbnails_cache_edit)),
-            ("Operator name", self.operator_name_edit),
+            (t("settings.input_folder"), self._make_browse_widget(self.input_folder_edit)),
+            (t("settings.output_folder"), self._make_browse_widget(self.output_folder_edit)),
+            (t("settings.discard_folder"), self._make_browse_widget(self.discard_folder_edit)),
+            (t("settings.grouping_mode"), self.grouping_mode_combo),
+            (t("settings.timestamp_gap_seconds"), self.timestamp_gap_spin),
+            (t("settings.autoplay_interval_seconds"), self.autoplay_interval_spin),
+            (t("settings.fixed_group_size"), self.fixed_group_size_spin),
+            (t("settings.prefer_exif"), self.exif_priority_check),
+            (t("settings.move_mode"), self.move_mode_combo),
+            (t("settings.language"), self.locale_combo),
+            (t("settings.safe_delete"), self.safe_delete_check),
+            (t("settings.category_file"), self._make_browse_widget(self.category_file_edit, is_file=True)),
+            (t("settings.metadata_file"), self._make_browse_widget(self.metadata_file_edit, is_file=True)),
+            (t("settings.thumbnails_cache_dir"), self._make_browse_widget(self.thumbnails_cache_edit)),
+            (t("settings.operator_name"), self.operator_name_edit),
         ):
             form.addRow(label, widget)
 
@@ -105,18 +111,27 @@ class SettingsDialog(QDialog):
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(line_edit)
 
-        browse_btn = QPushButton("Browse")
+        browse_btn = QPushButton(t("settings.browse"))
         browse_btn.clicked.connect(lambda: self._browse_path(line_edit, is_file=is_file))
         row.addWidget(browse_btn)
         return widget
 
     def _browse_path(self, target: QLineEdit, *, is_file: bool = False) -> None:
         if is_file:
-            path, _ = QFileDialog.getOpenFileName(self, "Select file")
+            path, _ = QFileDialog.getOpenFileName(self, t("dialog.select_file"))
         else:
-            path = QFileDialog.getExistingDirectory(self, "Select folder")
+            path = QFileDialog.getExistingDirectory(self, t("dialog.select_folder"))
         if path:
             target.setText(path)
+
+    @staticmethod
+    def _locale_display_name(locale: str) -> str:
+        mapping = {
+            "en": "English",
+            "es": "Español",
+            "ca": "Català",
+        }
+        return mapping.get(locale, "English")
 
     def load_from_settings(self, settings: Settings) -> None:
         self.input_folder_edit.setText(settings.input_folder or "")
@@ -142,6 +157,10 @@ class SettingsDialog(QDialog):
             self.move_mode_combo.setCurrentText(settings.move_mode)
         else:
             self.move_mode_combo.setCurrentText("move")
+
+        self.locale_combo.setCurrentText(
+            self._locale_display_name(settings.locale if settings.locale in {"en", "es", "ca"} else "en")
+        )
 
     def validate(self) -> bool:
         gap = self.timestamp_gap_spin.value()
@@ -177,6 +196,14 @@ class SettingsDialog(QDialog):
         self.settings.fixed_group_size = int(self.fixed_group_size_spin.value())
         self.settings.exif_priority = bool(self.exif_priority_check.isChecked())
         self.settings.move_mode = self.move_mode_combo.currentText()
+        selected_locale = self.locale_combo.currentText()
+        locale_mapping = {
+            "English": "en",
+            "Español": "es",
+            "Català": "ca",
+        }
+        self.settings.locale = locale_mapping.get(selected_locale, "en")
+        set_locale(self.settings.locale)
         self.settings.safe_delete = bool(self.safe_delete_check.isChecked())
         self.settings.category_file_path = self.category_file_edit.text().strip() or None
         self.settings.metadata_file_path = self.metadata_file_edit.text().strip() or None
@@ -190,9 +217,8 @@ class SettingsDialog(QDialog):
         if not self.validate():
             QMessageBox.warning(
                 self,
-                "Invalid settings",
-                "Please provide valid folder paths, a positive timestamp gap, "
-                "and a valid fixed group size when needed.",
+                t("settings.invalid_title"),
+                t("settings.invalid_message"),
             )
             return
         self.apply_to_settings()

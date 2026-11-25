@@ -78,6 +78,9 @@ class Settings:
     - exif_priority: Prefer reading EXIF DateTimeOriginal when available; if
         false, the loader will prefer filesystem mtime.
 
+    - locale: User interface language. Supported values are "en", "es", and
+        "ca".
+
     - operator_name: Optional name of the current operator to include in logs.
     """
     # Folders
@@ -104,6 +107,9 @@ class Settings:
 
     # IO & behavior
     exif_priority: bool = True  # prefer EXIF timestamp over mtime
+
+    # Localization
+    locale: str = "en"  # en | es | ca
 
     # Operator
     operator_name: Optional[str] = None
@@ -144,6 +150,10 @@ class Settings:
             raise ValueError(
                 "Unsupported grouping_mode. Supported values are: "
                 "'timestamp_gap' and 'fixed_size'."
+            )
+        if "locale" in d and d["locale"] not in {"en", "es", "ca"}:
+            raise ValueError(
+                "Unsupported locale. Supported values are: 'en', 'es', and 'ca'."
             )
         validate_settings_data(d)
         return cls(**d)

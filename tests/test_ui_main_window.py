@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from pytest import MonkeyPatch
 
 from acteo.classifier import ClassificationResult
+from acteo.i18n import set_locale, t
 from acteo.image_viewer import ImageTile, ImageViewer
 from acteo.main_window import MainWindow
 from acteo.sequence_loader import Sequence
@@ -40,6 +41,40 @@ def test_main_window_sets_sequences_and_populates_viewer(tmp_path: Path) -> None
     assert window._sequence_list.count() == 1
     assert len(window._image_viewer._tiles) == 2
     assert window._image_viewer.get_selected_index() == 0
+
+
+def test_image_viewer_uses_translated_preview_labels_for_supported_locales() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    for locale in ("en", "es", "ca"):
+        set_locale(locale)
+        viewer = ImageViewer()
+        viewer.set_sequence("seq-empty", [])
+
+        assert viewer._preview_title.text() == t("viewer.selected_image", locale=locale)
+        assert viewer._preview_label.text() == t("viewer.no_image_selected", locale=locale)
+        assert viewer._preview_name.text() == ""
+
+
+def test_main_window_refreshes_labels_after_locale_switch() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    window = MainWindow(settings=Settings(locale="en"))
+
+    assert window.windowTitle() == t("app_title", locale="en")
+    assert window._play_pause_action is not None
+    assert window._play_pause_action.text() == t("main.play", locale="en")
+
+    window.settings.locale = "es"
+    window._apply_locale()
+
+    assert window.windowTitle() == t("app_title", locale="es")
+    assert window._play_pause_action.text() == t("main.play", locale="es")
+    assert window._status_label.text() == t("main.ready", locale="es")
 
 
 def test_main_window_autoplay_cycles_images_in_current_sequence(tmp_path: Path) -> None:

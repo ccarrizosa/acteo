@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 from typing_extensions import override
 
+from .i18n import t
 from .thumbnail_cache import ThumbnailCache
 
 if TYPE_CHECKING:
@@ -92,7 +93,7 @@ class ImageTile(QWidget):
         try:
             cached = self._cache.get(self.path, size=max(self.tile_width, self.tile_height))
             if cached is None:
-                self._display_label.setText(f"Error loading\n{Path(self.path).name}")
+                self._display_label.setText(f"{t('viewer.error_loading')}\n{Path(self.path).name}")
                 return
 
             pixmap = cached
@@ -135,7 +136,7 @@ class ImageTile(QWidget):
             self._display_label.setPixmap(canvas)
             self._display_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         except Exception as exc:  # pragma: no cover - defensive UI fallback
-            self._display_label.setText(f"Error: {str(exc)[:20]}")
+            self._display_label.setText(f"{t('viewer.error_prefix')} {str(exc)[:20]}")
 
     def rotate_right(self) -> None:
         """Rotate image 90 degrees clockwise."""
@@ -198,9 +199,9 @@ class ImageViewer(QWidget):
         self._preview_layout = QVBoxLayout(self._preview_container)
         self._preview_layout.setContentsMargins(8, 8, 8, 8)
 
-        self._preview_title = QLabel("Selected image")
+        self._preview_title = QLabel(t("viewer.selected_image"))
         self._preview_title.setStyleSheet("font-weight: 600; margin-bottom: 4px;")
-        self._preview_label = QLabel("No image selected")
+        self._preview_label = QLabel(t("viewer.no_image_selected"))
         self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._preview_label.setStyleSheet(
             "background: #f4f4f4; border: 1px solid #d0d0d0; min-height: 320px;"
@@ -227,10 +228,19 @@ class ImageViewer(QWidget):
         layout.addWidget(self._scroll, 2)
         self.setLayout(layout)
 
+    def apply_locale(self) -> None:
+        """Refresh preview labels to the currently active locale."""
+        self._preview_title.setText(t("viewer.selected_image"))
+        if not self._tiles:
+            self._preview_label.setText(t("viewer.no_image_selected"))
+            self._preview_name.setText("")
+            return
+        self._update_selected_preview()
+
     def _update_selected_preview(self) -> None:
         """Refresh the large preview based on the currently selected tile."""
         if not self._tiles:
-            self._preview_label.setText("No image selected")
+            self._preview_label.setText(t("viewer.no_image_selected"))
             self._preview_name.setText("")
             return
 
@@ -240,7 +250,7 @@ class ImageViewer(QWidget):
             size=max(1, self._preview_label.width()),
         )
         if pixmap is None:
-            self._preview_label.setText(f"Error loading\n{Path(path).name}")
+            self._preview_label.setText(f"{t('viewer.error_loading')}\n{Path(path).name}")
             self._preview_name.setText(Path(path).name)
             return
 
