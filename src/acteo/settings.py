@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Optional, cast
@@ -10,11 +12,10 @@ import jsonschema
 
 DEFAULT_CONFIG_NAME = "acteo_settings.json"
 
-SETTINGS_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "settings.schema.json"
-
 
 def _load_schema() -> dict[str, Any]:
-    with SETTINGS_SCHEMA_PATH.open("r", encoding="utf-8") as f:
+    schema_path = bundled_resource_path("schemas", "settings.schema.json")
+    with schema_path.open("r", encoding="utf-8") as f:
         return cast(dict[str, Any], json.load(f))
 
 
@@ -183,16 +184,64 @@ class Settings:
                 json.dump(normalized, f, indent=2, ensure_ascii=False)
         return settings
 
-def default_config_dir() -> str:
-    # Respect XDG on Linux, fall back to home
-    xdg = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
-        os.path.expanduser("~"), ".config"
-    )
-    return os.path.join(xdg, "acteo")
+def _windows_config_dir(environ: Mapping[str, str], home_dir: Path) -> Path:
+    """Resolve the Windows Acteo configuration directory.
+
+    Args:
+        environ: Environment-variable mapping to inspect.
+        home_dir: User home directory used for fallback resolution.
+
+    Returns:
+        A platform-appropriate, absolute Acteo configuration path.
+    """
+    base = environ.get("LOCALAPPDATA") or environ.get("APPDATA")
+    if base:
+        return (Path(base).expanduser() / "Acteo").resolve()
+    return (home_dir / "AppData" / "Local" / "Acteo").resolve()
+
+
+def _unix_config_dir(environ: Mapping[str, str], home_dir: Path) -> Path:
+    """Resolve the Acteo directory using the existing Unix/XDG layout.
+
+    Args:
+        environ: Environment-variable mapping to inspect.
+        home_dir: User home directory used for fallback resolution.
+
+    Returns:
+        An absolute Acteo configuration path.
+    """
+    xdg_base = environ.get("XDG_CONFIG_HOME")
+    if not xdg_base:
+        xdg_base = str(home_dir / ".config")
+    return (Path(xdg_base).expanduser() / "acteo").resolve()
+
+
+def default_config_dir(
+    platform_name: Optional[str] = None,
+    environ: Optional[Mapping[str, str]] = None,
+) -> str:
+    """Return the platform-specific Acteo configuration directory.
+
+    Args:
+        platform_name: Optional platform override, such as ``"win32"`` or
+            ``"linux"``. Uses ``sys.platform`` when omitted.
+        environ: Optional environment mapping for testable platform resolution.
+            Uses ``os.environ`` when omitted.
+
+    Returns:
+        Absolute path to the Acteo configuration directory.
+    """
+    platform = platform_name or sys.platform
+    environment = environ if environ is not None else os.environ
+    home_dir = Path.home()
+
+    if platform == "win32":
+        return str(_windows_config_dir(environment, home_dir))
+    return str(_unix_config_dir(environment, home_dir))
 
 
 def default_config_path() -> str:
-    return os.path.join(default_config_dir(), DEFAULT_CONFIG_NAME)
+    return str((Path(default_config_dir()) / DEFAULT_CONFIG_NAME).resolve())
 
 
 def ensure_paths(settings: Settings) -> Settings:
@@ -200,8 +249,7 @@ def ensure_paths(settings: Settings) -> Settings:
     def _expand(p: Optional[str]) -> Optional[str]:
         if not p:
             return None
-        p = os.path.expanduser(p)
-        return os.path.abspath(p)
+        return str(Path(p).expanduser().resolve())
 
     s = settings
     s.input_folder = _expand(s.input_folder)
@@ -209,16 +257,46 @@ def ensure_paths(settings: Settings) -> Settings:
     s.discard_folder = _expand(s.discard_folder)
     config_dir = default_config_dir()
     s.category_file_path = (
-        _expand(s.category_file_path) or os.path.join(config_dir, "categories.json")
+        _expand(s.category_file_path)
+        or str((Path(config_dir) / "categories.json").resolve())
     )
-    config_dir = default_config_dir()
-    s.metadata_file_path = _expand(s.metadata_file_path) or os.path.join(
-        config_dir, "metadata.csv"
+    s.metadata_file_path = _expand(s.metadata_file_path) or str(
+        (Path(config_dir) / "metadata.csv").resolve()
     )
-    s.thumbnails_cache_dir = _expand(s.thumbnails_cache_dir) or os.path.join(
-        config_dir, "thumbnails"
+    s.thumbnails_cache_dir = _expand(s.thumbnails_cache_dir) or str(
+        (Path(config_dir) / "thumbnails").resolve()
     )
     return s
+
+
+def bundled_application_root() -> Path:
+    """Return the source or PyInstaller root containing application resources.
+
+    Returns:
+        The repository root when running from source, or the PyInstaller
+        extraction directory when running from a frozen executable.
+    """
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass).resolve()
+
+    return Path(__file__).resolve().parents[2]
+
+
+def bundled_resource_path(*relative_parts: str) -> Path:
+    """Resolve a repository resource in source and frozen applications.
+
+    Args:
+        *relative_parts: Path components relative to the application root.
+
+    Returns:
+        Absolute path to the requested resource.
+    """
+    return (bundled_application_root().joinpath(*relative_parts)).resolve()
+
+
+SETTINGS_SCHEMA_PATH = bundled_resource_path("schemas", "settings.schema.json")
 
 
 if __name__ == "__main__":

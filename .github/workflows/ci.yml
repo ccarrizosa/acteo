@@ -38,3 +38,83 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           PYTHONPATH: src
         run: python -m pytest -q
+
+  # Native Windows validation is kept separate so Linux CI remains unchanged.
+  windows-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install validation and build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-windows-build.txt
+          python -m pip install ruff mypy
+
+      - name: Lint with ruff
+        shell: pwsh
+        run: ruff check src tests
+
+      - name: Type check with mypy
+        shell: pwsh
+        run: mypy --config-file mypy.ini
+
+      - name: Run tests offscreen
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONPATH: src
+        run: python -m pytest -q
+
+      # Native packaging is delegated to this Windows runner.
+      - name: Build PyInstaller directory bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          & pwsh -NoProfile -File .\build\package_windows.ps1 2>&1 | Tee-Object -FilePath build\pyinstaller.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # The smoke test is headless and requires no interactive desktop.
+      - name: Smoke-test packaged executable
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          & python build\smoke_windows.py dist\Acteo\Acteo.exe resources\samples 2>&1 | Tee-Object -FilePath build\smoke.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Inno Setup is Windows-only and ordinary CI builds remain unsigned.
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Inno Setup installer
+        shell: pwsh
+        run: |
+          & pwsh -NoProfile -File .\build\package_installer.ps1 2>&1 | Tee-Object -FilePath build\installer.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload executable bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acteo-windows-bundle
+          if-no-files-found: warn
+          path: dist/Acteo/
+
+      - name: Upload unsigned installer and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acteo-windows-installer
+          if-no-files-found: warn
+          path: |
+            dist/installer/
+            build/*.log
