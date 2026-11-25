@@ -21,6 +21,20 @@ from .settings import Settings, ensure_paths
 logger = logging.getLogger(__name__)
 
 
+def _qt_application_arguments(argv: Optional[List[str]]) -> List[str]:
+    """Build the argument list passed to the Qt application.
+
+    Args:
+        argv: Explicit Acteo arguments, or ``None`` to use process arguments.
+
+    Returns:
+        Command-line arguments suitable for ``QApplication``.
+    """
+    if argv is None:
+        return sys.argv
+    return [sys.argv[0]]
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the Acteo application with UI.
 
@@ -65,7 +79,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
     # Create Qt app
-    app = QApplication(sys.argv)
+    app = QApplication(_qt_application_arguments(argv))
 
     # Create main window
     window = MainWindow(cfg, sequences=sequences)

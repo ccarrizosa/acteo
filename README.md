@@ -48,3 +48,46 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=src python -m pytest tests/test_packaging_e
 ```
 
 See `docs/SETTINGS.md` for configuration details.
+
+### Windows packaging dependencies
+
+Use a dedicated virtual environment for Windows builds. The build requirements file includes the normal runtime dependencies plus PyInstaller; it is not needed for application users or normal Linux development:
+
+```powershell
+python -m venv .venv-build
+. .\.venv-build\Scripts\Activate.ps1
+python -m pip install -r requirements-windows-build.txt
+```
+
+Keep `requirements.txt` limited to runtime and test dependencies. Build-time packaging tools belong in `requirements-windows-build.txt`.
+
+### Build the Windows application bundle
+
+Run the PowerShell 7 build script from the repository root. It creates a dedicated `.venv-build`, installs `requirements-windows-build.txt`, cleans prior PyInstaller outputs, and verifies the executable:
+
+```powershell
+pwsh -File .\build\package_windows.ps1
+```
+
+Supported options include `-Clean:$false`, `-DebugBuild`, `-Version 'x.y.z'`, and `-VirtualEnvPath '.venv-custom'`. This creates `dist/Acteo/Acteo.exe`; the specification bundles `schemas/settings.schema.json` and does not create a console window.
+
+### Build the Windows installer
+
+After creating `dist/Acteo/Acteo.exe`, build the per-user Inno Setup installer with PowerShell 7:
+
+```powershell
+pwsh -File .\build\package_installer.ps1
+```
+
+The helper reads the Acteo version from `pyproject.toml`, searches standard Inno Setup locations, and creates `dist/installer/Acteo-<version>-Setup.exe`. Pass `-InnoSetupCompiler` or set `INNO_SETUP_COMPILER` if ISCC is installed outside the standard locations.
+
+### Smoke-test the packaged executable
+
+On Windows CI or a Windows test machine, verify that the PyInstaller bundle starts without an immediate crash:
+
+```powershell
+$env:QT_QPA_PLATFORM = 'offscreen'
+python build\smoke_windows.py dist\Acteo\Acteo.exe resources\samples
+```
+
+The smoke test starts Acteo offscreen, passes the sample directory as input, requires it to remain alive briefly, and terminates it cleanly.
